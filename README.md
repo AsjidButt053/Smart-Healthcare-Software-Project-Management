@@ -1,57 +1,135 @@
-# Smart Healthcare Project Management System
-CSE-494 Software Project Management · React.js + Node.js/Express + MongoDB
+# Smart Healthcare Project Management and Monitoring System
 
-A working project-management application for the five-hospital Smart Healthcare case study
-(16 weeks, PKR 5,000,000 budget, +PKR 800,000 / +3 weeks from the AI diagnosis and mobile app changes).
+A full-stack web application that lets a project manager plan, execute, monitor and control a software project in one place. It was built for the **Software Project Management** case study of a five-hospital Smart Healthcare system (16 weeks, PKR 5,000,000 budget) and covers scope, schedule, cost, quality and risk with persistent storage and an interactive interface.
 
-## Run it (3 steps)
-Requirements: Node.js 18+ and MongoDB (local install, or a free MongoDB Atlas cluster).
+## Features
+
+The system is organised into six modules that share one database and one dashboard.
+
+| # | Module | What it does |
+|---|--------|--------------|
+| 1 | **Project Initiation and Integration** | Project charter, management plan (scope, schedule, cost, quality), stakeholders, milestones, responsibilities, status settings and controlled project closure |
+| 2 | **Scope Management and WBS** | Requirements register with MoSCoW priorities and approval states, auto-generated Work Breakdown Structure with cost roll-up, formal change request workflow |
+| 3 | **Schedule and Resource Management** | Activities with dependencies and owners, forward and backward pass, delay detection and propagation, critical path, float and Gantt chart |
+| 4 | **Cost Management and EVM** | Planned and actual cost tracking, Earned Value indicators (PV, EV, AC, CPI, SPI, CV, SV, BAC, EAC, ETC, VAC) and automatic threshold warnings |
+| 5 | **Quality and Risk Control** | Defect log, quality checklist with inspection results, prioritization matrix, Process Decision Program Chart (PDPC) and risk register |
+| 6 | **Integration, Validation and Reporting** | Single dashboard, consistency rules between modules, input validation and central error handling |
+
+### Key business rules
+
+- Only **Approved** requirements can have activities scheduled against them.
+- Scope, schedule and budget changes go through a **change request**; approving one stores a before/after impact snapshot.
+- Circular dependencies between activities are detected and rejected with a descriptive error.
+- A project cannot be closed while activities are incomplete, critical defects are unresolved or change requests are pending.
+- Risk score is calculated automatically as likelihood x impact.
+- CPI and SPI warning thresholds are configurable (default 0.90).
+
+## Tech stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18, React Router, Vite, CSS |
+| Backend | Node.js, Express.js |
+| Database | MongoDB with Mongoose |
+| Testing | Node.js built-in test runner |
+
+## Architecture
+
+A three-tier design: the React app calls the Express REST API under `/api`, which validates requests, applies business rules and reads or writes MongoDB through Mongoose models. During development the Vite dev server proxies `/api` calls to the backend on port 5000.
+
+The scheduling and EVM logic lives in pure functions (`schedule.js`, `evm.js`) that take plain data and return results without touching the database. The WBS, schedule, EVM figures and dashboard are computed on every request from the stored records, so they always agree with the data.
+
+## Project structure
+
+```
+backend/
+  src/
+    models/index.js     Mongoose schemas (project, requirements, activities, change requests, defects, checklist, risks)
+    lib/schedule.js     Topological sort, cycle detection, forward/backward pass, delay propagation, critical path
+    lib/evm.js          PV, EV, AC, CPI, SPI, CV, SV, EAC, ETC, VAC and threshold warnings
+    lib/state.js        Loads data, runs the engines and builds the dashboard summary
+    routes/api.js       REST endpoints and business rules
+    server.js           Express setup, MongoDB connection, central error handler
+    seed.js             Case-study sample data and reset function
+  tests/logic.test.js   Automated tests for the calculation engines
+frontend/
+  src/pages/            Dashboard, Initiation, Scope, Schedule, Cost, Quality and Risks screens
+  src/ui.jsx            Shared components: table, form dialog, tabs, badges, alerts, toasts
+```
+
+## Getting started
+
+### Prerequisites
+
+- Node.js 18 or later and npm
+- MongoDB (a local installation or a free MongoDB Atlas cluster)
+
+### 1. Start the backend
 
 ```bash
-# 1. Backend  (terminal 1)
 cd backend
 npm install
-# edit .env if your MongoDB is not on localhost (Atlas: paste your connection string into MONGO_URI)
-npm start            # loads the case-study sample data automatically on first run
+npm start
+```
 
-# 2. Frontend (terminal 2)
+If MongoDB is not running on localhost, edit `.env` and set `MONGO_URI` (for Atlas, paste your connection string). When the database is empty, the case-study sample data is loaded automatically. The API runs on `http://localhost:5000`.
+
+### 2. Start the frontend
+
+Open a second terminal:
+
+```bash
 cd frontend
 npm install
-npm run dev          # open http://localhost:5173
+npm run dev
 ```
-Useful commands: `npm run seed` (reset sample data, backend), `npm test` (unit tests, backend), `npm run build` (frontend).
-The sidebar button **Reset sample data** also restores the demo state at any time.
 
-## Modules and where they live
-| # | Module | Screen | Backend |
-|---|--------|--------|---------|
-| 1 | Initiation & integration (charter, plan, status, milestones, responsibilities, closure) | Charter & Plan | `PUT /api/project`, `POST /api/project/close` |
-| 2 | Scope & WBS (requirements, WBS, change requests) | Scope & Changes | `/api/requirements`, `/api/wbs`, `/api/change-requests` |
-| 3 | Schedule & resources (dependencies, delays, critical path, Gantt) | Schedule | `/api/activities`, `/api/schedule`, `src/lib/schedule.js` |
-| 4 | Cost & EVM (PV, EV, AC, CPI, SPI + CV, SV, EAC, ETC, VAC, warnings) | Cost & EVM | `/api/evm`, `src/lib/evm.js` |
-| 5 | Quality & risk (defects, checklist, prioritization matrix, PDPC) | Quality, Risks | `/api/defects`, `/api/checklist`, `/api/risks` |
-| 6 | Integration, validation, reporting | Dashboard | `/api/dashboard`, error handler in `server.js` |
+Then open **http://localhost:5173** in your browser.
 
-## Suggested demonstration script (about 5 minutes)
-1. **Dashboard**: warnings show CPI 0.85, SPI 0.82, forecast over budget, finish 2 days after deadline, 2 critical defects, 2 pending change requests.
-2. **Scope → Requirements**: "Pharmacy inventory integration" is Proposed. Try to schedule it in **Schedule → Add activity**: the system refuses (unapproved requirement).
-3. **Schedule**: the Appointment module is delayed 15 days; the delay impact table lists the dependent activities that are pushed out; the Gantt shows baseline vs current bars, critical path and the deadline line.
-4. **Scope → Change requests**: approve "AI diagnosis module" and "Mobile application". Each approval shows a before → after panel: approved budget 5.0M → 5.8M, deadline +21 days, new requirements and activities appear in the WBS and Gantt, and EVM planned cost rises by PKR 800,000.
-5. **Cost & EVM → Update progress**: change an activity's actual cost and watch CPI/SPI and warnings recalculate.
-6. **Quality / Risks**: resolve a critical defect, record a checklist result, open the Prioritization matrix and the PDPC.
-7. **Charter → Close project** is refused with clear reasons until all conditions are met.
+### 3. Run the tests
 
-## Business rules enforced by the backend
-- An activity can only deliver an **Approved** requirement; requirements with activities cannot be un-approved or deleted.
-- Total planned activity cost can never exceed the approved budget (raise a change request instead).
-- Dependency cycles are rejected; deleting an activity removes it from other activities' dependencies.
-- Approving a change request atomically raises budget and deadline, approves its requirement, creates its activity, rewires successors, and stores a before/after snapshot.
-- Decided change requests are kept as an audit record and cannot be deleted.
-- Closure needs 100% progress, no unresolved critical defects, no pending change requests and an acceptor.
+```bash
+cd backend
+npm test
+```
 
-## Calculation notes
-- Schedule: calendar days. Forward pass gives start/end from dependencies; slip = max(reported delay, days an unfinished activity is past its baseline end); backward pass gives float, critical path and downstream impact.
-- EVM (as of the *status date* set in Charter & Plan): PV = planned cost × planned fraction elapsed (linear over the baseline dates), EV = planned cost × % complete, AC = actual cost, CPI = EV/AC, SPI = EV/PV, EAC = BAC/CPI.
-- Warnings: danger below the CPI/SPI threshold (default 0.90), warning below 1.0, danger if EAC or planned cost exceeds the approved budget.
+### 4. Reset the sample data
 
-See `docs/DATABASE_SCHEMA.md` and `docs/TEST_CASES.md` for submission material. Screenshots must be taken from your running copy.
+Use the **Reset sample data** button in the sidebar, or run `npm run seed` in the `backend` folder.
+
+## Sample data
+
+The seed data reproduces the case study so results are repeatable. The status date is 26 October 2026 and the project runs from 7 September 2026 to a deadline of 27 December 2026. It includes 12 activities, 11 approved and 3 proposed requirements, 2 pending change requests (an AI-based preliminary diagnosis module and a mobile app), 5 defects, 8 quality checklist items and 8 risks. With this data the dashboard reports **CPI 0.85** and **SPI 0.82**, and raises danger warnings because both fall below the 0.90 threshold.
+
+## REST API
+
+| Method and path | Purpose |
+|-----------------|---------|
+| `GET, PUT /api/project` | Read and update charter, plan, status, milestones, responsibilities, thresholds |
+| `POST /api/project/close` | Close the project after validation |
+| `GET, POST /api/requirements`; `PUT, DELETE /api/requirements/:id` | Requirements management |
+| `GET /api/wbs` | Generated WBS with cost roll-up |
+| `GET, POST /api/activities`; `PUT, DELETE /api/activities/:id` | Activities, costs and progress |
+| `GET /api/schedule` | Computed schedule, delays, impact, critical path, milestones |
+| `GET /api/evm` | Computed EVM indicators and warnings |
+| `GET, POST /api/change-requests` | List and create change requests |
+| `POST /api/change-requests/:id/decision` | Approve or reject a pending change request |
+| `DELETE /api/change-requests/:id` | Delete a pending change request |
+| `GET, POST /api/defects`; `PUT, DELETE /api/defects/:id` | Defect tracking |
+| `GET, POST /api/checklist`; `PUT /api/checklist-inspect/:id` | Quality checklist and inspection results |
+| `GET, POST /api/risks`; `PUT, DELETE /api/risks/:id` | Risk register |
+| `GET /api/dashboard` | Dashboard summary |
+| `POST /api/admin/seed` | Reset to the case-study sample data |
+
+## Limitations
+
+- Durations are in calendar days; working-day calendars and public holidays are not modelled.
+- Only finish-to-start dependencies are supported, without lead or lag.
+- There is no login or role-based access; the system assumes a single project manager.
+- It manages one project at a time.
+
+## Author
+
+**Muhammad Asjid Butt** (CIIT/FA23-BSE-053/SWL)
+BS Software Engineering, COMSATS University Islamabad, Sahiwal Campus
+Supervisor: Mr. Bilal Shabbir Qaisar
